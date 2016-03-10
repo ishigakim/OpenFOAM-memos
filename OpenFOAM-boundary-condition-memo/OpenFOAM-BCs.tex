@@ -1,0 +1,227 @@
+\documentclass[a4paper,fleqn]{jsarticle}
+
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{bm}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage[dvipdfmx]{color}
+
+\usepackage{url}
+
+%% source code
+%\usepackage{listings,jlisting}
+%\renewcommand{\lstlistingname}{source code}
+%\lstset{language=C++,
+%basicstyle=\ttfamily\small,
+%  commentstyle={ \color[cmyk]{1,0.4,1,0}},
+%  classoffset=1,
+%  keywordstyle={\bfseries \color[cmyk]{0,1,0,0}},
+%  stringstyle={\ttfamily \color[rgb]{0,0,1}},
+%  frame=tRBl,
+%  framesep=5pt,
+%  showstringspaces=false,
+%  numbers=left,
+%  stepnumber=1,
+%  numberstyle=\small,
+%  tabsize=2,
+%}
+
+\renewcommand{\figurename}{Fig.}
+\renewcommand{\refname}{Reference}
+%\renewcommand{\contentsname}{Contents}
+\renewcommand{\abstractname}{Abstract}
+
+%layout 
+\setlength{\topmargin}{-20mm}
+\setlength{\textheight}{25.5cm}
+\setlength{\oddsidemargin}{0pt}
+\setlength{\evensidemargin}{0pt}
+
+\pagestyle{headings}
+
+%date 
+\def\today{%
+  \ifcase\month\or
+                Jan.\or Feb.\or Mar.\or Apr.\or May.\or Jun.\or
+                Jul.\or Aug.\or Sep.\or Oct.\or Nov.\or Dec.
+  		\fi\hspace{0.0em} 
+%  \ifnum\month<10 0\fi\the\month/%
+  \ifnum\day<10 0\fi\the\day, 
+  \the\year%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% end preamble
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+
+\thispagestyle{plain}
+%% report title
+\begin{flushleft}
+\begin{Large}
+OpenFOAMの境界条件の取扱い方について
+\end{Large}
+\end{flushleft}
+
+%% author
+\begin{flushright}
+\西暦
+作成　2016/03/10\\
+\end{flushright}
+
+
+\begin{abstract}
+CFDコードOpenFOAMで境界条件がどのように扱われているかについて説明する。
+\end{abstract}
+
+\hrulefill
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%  本文
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+\section{fixedValue, fixedGradientについて}
+これらの境界条件の説明については\cite{Nozaki}が詳しい。本節でもこれを元
+にして説明を行う。
+
+Fig.\ref{fig:cell}に示すような1次元の計算セルでの離散化を考える。セル中
+心Pと境界Bでの境界条件を考える。セル中心Pと境界Bの間の距離を$\Delta x$と
+する。
+%%% Figure
+ \begin{figure}[htbp]
+  \begin{center}
+   \includegraphics[scale=0.4]{Fig/cell.pdf}
+   \caption{1D mesh}
+   \label{fig:cell}
+  \end{center}
+\end{figure}
+
+変数$u$の移流拡散方程式を有限体積法により解くものとする。$\nabla \cdot \nabla u$お
+よび$\nabla \cdot u$は以下のように離散化される。
+
+\begin{align}
+ & \int \nabla \cdot (\nabla u) dV=\int \nabla u \cdot \bm{n}dS
+ \approx \sum \nabla u \cdot \bm{n} S_f \\
+ & \int \nabla \cdot u dV=\int u \cdot \bm{n} dS \approx \sum u \cdot
+ \bm{n} S_f
+\end{align}
+$S_f$はfaceでのセル面積である。これらの式から境界での$\nabla u$および$u$
+の値が必要であることが分かる。
+
+\subsection{fixedValueについて}
+はじめにDirichlet条件であるfixedValueについて考える。境界条件として
+
+\begin{align}
+ u_b=a
+\end{align}
+を考える。$a$は定数とする。
+
+まず$\nabla u$の境界条件について考える。
+\begin{align}
+ & \nabla u|_{boundary}\cdot \bm{n}=\frac{u_b-u_p}{\Delta x} 
+ = -\frac{1}{\Delta x} u_p + \frac{1}{\Delta x} a \label{eq:BC1}
+\end{align}
+
+OpenFOAMでは(\ref{eq:BC1})の係数がそれぞれgradinetInternalCoeff,
+gradientBoundaryCoeffとして扱われる。InternalCoeffはセル内部の未知数に対
+する係数であり，連立1次方程式の係数行列に反映される。一方BoundaryCoeffは
+境界の値そのものであり，連立1次方程式の右辺ベクトルに反映される。
+
+\begin{align}
+& gradientInternalCoeff=-\frac{1}{\Delta x} \\
+& gradientBoundaryCoeff=\frac{1}{\Delta x}a
+\end{align}
+
+
+つぎに$u$の境界条件について考える。ここではすでに$u|_{boundary}=a$として値は分かっている。
+これらの値はvalueInternalCoeff, valueBoundaryCoeffとして扱われる。
+
+\begin{align}
+& valueInternalCoeff=0 \\
+& valueBoundaryCoeff=a 
+\end{align}
+
+
+\subsection{fixedGradientについて}
+Neumann条件であるfixedGradientについて考える。境界条件として
+
+\begin{align}
+ \nabla u|_{boundary} \cdot \bm{n}=b
+\end{align}
+を考える。$b$は定数。
+
+$\nabla u$について考えると，すでに境界条件として与えられているので
+
+\begin{align}
+& gradientInternalCoeff=0 \\
+& gradientBoundaryCoeff=b
+\end{align}
+
+つぎに$u$の条件を考える。
+\begin{align}
+ \nabla u\cdot \bm{n}=\frac{u_b-u_p}{\Delta x}=b
+\end{align}
+より
+\begin{align}
+ u_b=u_p+b\Delta x
+\end{align}
+よって
+\begin{align}
+& valueInternalCoeff=1 \\
+& valueBoundaryCoeff=b\Delta x 
+\end{align}
+
+
+\section{mixedについて}
+Robin条件であるmixeについて考える。境界条件として
+\begin{align}
+ \alpha u_b +(1-\alpha)\nabla u|_b \cdot \bm{n} \Delta x=\alpha a + (1-\alpha)b
+\end{align}
+を考える。ここで$\alpha$は重み係数，$u_{ref}=a,\nabla u_{ref}\cdot \bm{n}=b$は定数とする。
+$a,b$の値はOpenFOAMではそれぞれrefValue, refGradとして扱われる量である。
+$\alpha$はvalueFracとして扱われる。
+
+\begin{align}
+ \nabla u|_b\cdot \bm{n}=\frac{u_b-u_p}{\Delta x}
+\end{align}
+より
+\begin{align}
+ & \alpha u_b+(1-\alpha)(u_b-u_p)=\alpha a+(1-\alpha)b \\
+ & u_b=(1-\alpha)u_p+\alpha a +(1-\alpha)b\Delta x
+\end{align}
+
+$\nabla u|_b \cdot \bm{n}$について考える。
+\begin{align}
+ & \nabla u|_b \cdot \bm{n}=\frac{u_b-u_p}{\Delta x} \\
+ & =\frac{-\alpha}{\Delta x}u_p +\frac{\alpha a}{\Delta x} +(1-\alpha)b
+\end{align}
+であるから
+\begin{align}
+& gradientInternalCoeff=\frac{-\alpha}{\Delta x}\\
+& gradientBoundaryCoeff=\frac{\alpha a}{\Delta x} +(1-\alpha)b
+\end{align}
+
+つぎに$u_b$について考えると，
+\begin{align}
+& u_b=(1-\alpha)u_p+\alpha a +(1-\alpha)b\Delta x
+\end{align}
+より
+\begin{align}
+& valueInternalCoeff=(1-\alpha) \\
+& valueBoundaryCoeff=\alpha a +(1-\alpha)b\Delta x
+\end{align}
+
+
+
+%% reference
+\begin{thebibliography}{99}
+\bibitem{Nozaki} F. Nozaki, OpenFOAM 空間の離散化と係数行列の取り扱い, \url{http://www.slideshare.net/fumiyanozaki96/openfoam-32087641}
+
+\end{thebibliography}
+
+
+
+\end{document}
