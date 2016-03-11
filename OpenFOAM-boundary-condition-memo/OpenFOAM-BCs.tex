@@ -6,6 +6,14 @@
 \usepackage[dvipdfmx]{color}
 
 \usepackage{url}
+\usepackage{okumacro}
+
+ %ハイパーリンクの設定
+\usepackage[dvipdfmx,colorlinks=true, bookmarks=true,
+bookmarksnumbered=true, bookmarkstype=toc, linkcolor=blue,
+urlcolor=blue, citecolor=blue]{hyperref}
+
+\usepackage{pxjahyper}
 
 %% source code
 %\usepackage{listings,jlisting}
@@ -27,7 +35,7 @@
 
 \renewcommand{\figurename}{Fig.}
 \renewcommand{\refname}{Reference}
-%\renewcommand{\contentsname}{Contents}
+\renewcommand{\contentsname}{Contents}
 \renewcommand{\abstractname}{Abstract}
 
 %layout 
@@ -75,6 +83,8 @@ OpenFOAMの境界条件の取扱い方について
 \begin{abstract}
 CFDコードOpenFOAMで境界条件がどのように扱われているかについて説明する。
 \end{abstract}
+
+%\tableofcontents
 
 \hrulefill
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -176,7 +186,7 @@ $\nabla u$について考えると，すでに境界条件として与えられ�
 
 
 \section{mixedについて}
-Robin条件であるmixeについて考える。境界条件として
+Robin条件であるmixedについて考える。境界条件として
 \begin{align}
  \alpha u_b +(1-\alpha)\nabla u|_b \cdot \bm{n} \Delta x=\alpha a + (1-\alpha)b
 \end{align}
@@ -190,7 +200,7 @@ $\alpha$はvalueFracとして扱われる。
 より
 \begin{align}
  & \alpha u_b+(1-\alpha)(u_b-u_p)=\alpha a+(1-\alpha)b \\
- & u_b=(1-\alpha)u_p+\alpha a +(1-\alpha)b\Delta x
+ & u_b=(1-\alpha)u_p+\alpha a +(1-\alpha)b\Delta x \label{eq:mixed}
 \end{align}
 
 $\nabla u|_b \cdot \bm{n}$について考える。
@@ -214,6 +224,77 @@ $\nabla u|_b \cdot \bm{n}$について考える。
 & valueBoundaryCoeff=\alpha a +(1-\alpha)b\Delta x
 \end{align}
 
+\subsection{mixedの使用例としてのwallHeatTransfer}
+熱伝達係数$h$を指定した壁面熱伝達の境界条件wallHeatTransferではmixedを使っ
+て，実装されている。mixedを用いた具体例として説明する。
+
+Fig.\ref{fig:wallheat}に壁面熱伝達の模式図を示す。流体側の壁面隣接セル内
+部の温度を$T_i$，壁面温度を$T_w$，外部の代表温度を$T_{inf}$とする。流体
+から壁面への熱流束$q_{in}$は流体の熱伝導度$k$とセルサイズ$\Delta x$より
+以下のように書ける。
+
+\begin{align}
+q_{in}=k\frac{T_i-T_w}{\Delta x} 
+\end{align}
+一方壁面から外部への熱流束$q_{out}$は熱伝達係数$h$を用いて
+\begin{align}
+ q_{out}=h(T_w-T_{inf})
+\end{align}
+
+$q_{in}=q_{out}$より$T_w$についての整理すると
+\begin{align}
+ T_w&=\frac{\frac{k}{\Delta x}T_i+h T_{inf}}{\frac{k}{\Delta x}+h} \\
+ &=\frac{\frac{k}{h\Delta x}T_i+T_{inf}}{1+\frac{k}{h\Delta x}}
+\end{align}
+%
+これが温度の境界条件となる。(\ref{eq:mixed})に示したmixedの境界での値
+$u_b$の式と比較すると，以下のように係数を設定することでmixedを用いてこの
+境界条件を実装できることが分かる。
+
+\begin{align}
+ & 1-\alpha=\frac{k/h\Delta x}{1+k/h\Delta x} \\
+ &\alpha a=\frac{T_{inf}}{1+k/h\Delta x}\\
+ &b=0 
+\end{align}
+
+上式から
+\begin{align}
+ & a=T_{inf} \label{eq:a} \\
+ &b=0 \label{eq:b} \\
+ &\alpha=\frac{1}{1+k/h\Delta x} \label{eq:alpha}
+\end{align}
+となる。
+
+wallHeatTransferの実装をみると（OpenFOAM-2.3.x）
+
+ \begin{screen}
+  \begin{verbatim}
+  refValue() = Tinf_;
+  refGrad() = 0.0;
+  \end{verbatim}
+ \end{screen}
+
+ \begin{screen}
+  \begin{verbatim}
+  valueFraction() =
+        1.0/
+        (
+            1.0
+          + turbModel.kappaEff(patchi)*patch().deltaCoeffs()/alphaWall_
+        );
+  \end{verbatim}
+ \end{screen}
+となっており，(\ref{eq:a})-(\ref{eq:alpha})となるように実装されていることが
+分かる。ここでkappaEff(patchi)が熱伝導度，deltaCoeffs()が$\Delta x$の逆
+数，alphaWall\_が熱伝達係数をそれぞれ表している。
+ 
+ \begin{figure}[htbp]
+  \begin{center}
+   \includegraphics[scale=0.6]{Fig/wallheat.pdf}
+   \caption{Wall heat transfer}
+   \label{fig:wallheat}
+  \end{center}
+\end{figure}
 
 
 %% reference
